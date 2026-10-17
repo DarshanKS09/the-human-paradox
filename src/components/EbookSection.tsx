@@ -11,7 +11,7 @@ export default function EbookSection() {
     <section
       id="ebook"
       aria-labelledby="ebook-heading"
-      className="grain relative scroll-mt-16 bg-ink-soft"
+      className="grain relative scroll-mt-16 bg-ink-soft sm:scroll-mt-[4.5rem]"
     >
       <div className="shell section-pad grid gap-12 sm:gap-14 lg:grid-cols-[0.95fr_1.05fr] lg:items-center xl:gap-20">
         <div className="relative mx-auto w-full max-w-[300px] sm:max-w-[340px] lg:mx-0 lg:max-w-none xl:max-w-[440px]">

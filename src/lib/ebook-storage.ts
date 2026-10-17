@@ -43,7 +43,9 @@ export function resolveLocalEbookPath(): string | null {
   const configured = getServerConfig().ebookPdfPath;
   const absolute = isAbsolute(configured)
     ? configured
-    : resolve(process.cwd(), configured);
+    // turbopackIgnore: the path is intentionally runtime-configurable via
+    // EBOOK_PDF_PATH and must not be statically traced at build time.
+    : resolve(/*turbopackIgnore: true*/ process.cwd(), configured);
   try {
     const stat = statSync(absolute);
     return stat.isFile() && stat.size > 0 ? absolute : null;
@@ -64,7 +66,7 @@ export function checkEbookAvailabilitySync(): EbookAvailability {
   const cfg = getServerConfig();
   const resolvedPath = isAbsolute(cfg.ebookPdfPath)
     ? cfg.ebookPdfPath
-    : resolve(process.cwd(), cfg.ebookPdfPath);
+    : resolve(/*turbopackIgnore: true*/ process.cwd(), cfg.ebookPdfPath);
   const local = resolveLocalEbookPath();
   if (local) return { available: true, resolvedPath: local, source: "file" };
   if (cfg.ebookPdfUrl) {
@@ -81,7 +83,7 @@ export async function checkEbookAvailability(
   const cfg = getServerConfig();
   const resolvedPath = isAbsolute(cfg.ebookPdfPath)
     ? cfg.ebookPdfPath
-    : resolve(process.cwd(), cfg.ebookPdfPath);
+    : resolve(/*turbopackIgnore: true*/ process.cwd(), cfg.ebookPdfPath);
 
   if (cfg.ebookPdfUrl) {
     try {

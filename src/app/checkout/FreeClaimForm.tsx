@@ -98,7 +98,7 @@ export default function FreeClaimForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate={false}>
+    <form onSubmit={handleSubmit} className="mt-5 space-y-4 sm:mt-6 sm:space-y-5" noValidate={false}>
       <div>
         <label
           htmlFor="free-email"
@@ -119,7 +119,9 @@ export default function FreeClaimForm() {
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? "free-error" : "free-hint"}
           placeholder="you@example.com"
-          className="mt-2 block min-h-[48px] w-full border border-ivory/25 bg-ink px-4 py-3 text-ivory placeholder:text-faint disabled:opacity-60"
+          className="mt-2 block min-h-[52px] w-full border border-ivory/25 bg-ink px-4 py-3 text-base text-ivory placeholder:text-faint disabled:opacity-60"
+          enterKeyHint="send"
+          inputMode="email"
         />
         <p id="free-hint" className="mt-2 text-xs leading-relaxed text-faint">
           We send your download link here. No account is created, and we never
@@ -140,7 +142,7 @@ export default function FreeClaimForm() {
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex min-h-[48px] w-full items-center justify-center bg-ivory px-8 py-4 text-sm font-medium tracking-wide text-ink transition-colors hover:bg-accent disabled:opacity-60 sm:w-auto"
+        className="inline-flex min-h-[52px] w-full items-center justify-center bg-ivory px-8 py-4 text-base font-medium tracking-wide text-ink transition-colors hover:bg-accent disabled:opacity-60 sm:w-auto"
       >
         {busy ? "Sending…" : "Send Me the Free Ebook"}
       </button>

@@ -1,3 +1,5 @@
+import { SECTION_LINKS } from "@/config/site";
+
 export default function Hero() {
   return (
     <section
@@ -50,13 +52,13 @@ export default function Hero() {
               </p>
               <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap">
                 <a
-                  href="#ebook"
+                  href={SECTION_LINKS.ebook}
                   className="inline-flex min-h-[48px] w-full items-center justify-center bg-ivory px-8 py-4 text-sm font-medium tracking-wide text-ink transition-colors hover:bg-accent hover:text-ink sm:w-auto"
                 >
                   Explore the Ebook
                 </a>
                 <a
-                  href="#ideas"
+                  href={SECTION_LINKS.ideas}
                   className="inline-flex min-h-[48px] w-full items-center justify-center border border-ivory/25 px-8 py-4 text-sm tracking-wide text-ivory transition-colors hover:border-accent hover:text-accent sm:w-auto"
                 >
                   Discover Our Ideas

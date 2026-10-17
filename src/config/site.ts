@@ -49,8 +49,22 @@ export const EBOOK = {
     "Our ebook checkout is not live yet. Purchasing will be available soon — thank you for your patience.",
 } as const;
 
+/**
+ * Primary navigation. Paths are absolute ("/") rather than bare hashes
+ * ("#ebook") so they resolve correctly from every route — the checkout and
+ * success pages share this header.
+ */
 export const NAV_LINKS = [
-  { label: "Home", href: "#home" },
-  { label: "The Ebook", href: "#ebook" },
-  { label: "About", href: "#about" },
+  { label: "Home", href: "/" },
+  { label: "The Ebook", href: "/#ebook" },
+  { label: "About", href: "/#about" },
 ] as const;
+
+/** Landing-page section anchors. */
+export const SECTION_LINKS = {
+  ebook: "/#ebook",
+  ideas: "/#ideas",
+  about: "/#about",
+  home: "/",
+  checkout: "/checkout",
+} as const;

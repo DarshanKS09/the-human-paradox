@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SITE, YOUTUBE_URL } from "@/config/site";
+import { SECTION_LINKS, SITE, YOUTUBE_URL } from "@/config/site";
 
 export default function Footer() {
   const [year, setYear] = useState<number | null>(null);
@@ -29,7 +29,7 @@ export default function Footer() {
           <ul className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
             <li>
               <a
-                href="#home"
+                href={SECTION_LINKS.home}
                 className="flex min-h-[44px] items-center text-muted transition-colors hover:text-ivory"
               >
                 Home
@@ -37,7 +37,7 @@ export default function Footer() {
             </li>
             <li>
               <a
-                href="#ebook"
+                href={SECTION_LINKS.ebook}
                 className="flex min-h-[44px] items-center text-muted transition-colors hover:text-ivory"
               >
                 Ebook
@@ -45,7 +45,7 @@ export default function Footer() {
             </li>
             <li>
               <a
-                href="#about"
+                href={SECTION_LINKS.about}
                 className="flex min-h-[44px] items-center text-muted transition-colors hover:text-ivory"
               >
                 About

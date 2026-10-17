@@ -18,7 +18,11 @@ const THEMES = [
 
 export default function Philosophy() {
   return (
-    <section id="ideas" aria-labelledby="ideas-heading" className="relative">
+    <section
+      id="ideas"
+      aria-labelledby="ideas-heading"
+      className="relative scroll-mt-16 sm:scroll-mt-[4.5rem]"
+    >
       <div className="shell section-pad">
         <p className="text-[11px] tracking-[0.2em] text-accent sm:text-xs sm:tracking-[0.28em]">
           CHAPTER ONE — WHAT WE EXPLORE

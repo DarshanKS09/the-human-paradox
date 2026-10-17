@@ -1,3 +1,5 @@
+import { SECTION_LINKS } from "@/config/site";
+
 export default function Closing() {
   return (
     <section
@@ -23,7 +25,7 @@ export default function Closing() {
           person behind the thoughts.
         </p>
         <a
-          href="#ebook"
+          href={SECTION_LINKS.ebook}
           className="mt-10 inline-flex min-h-[48px] w-full items-center justify-center border border-ivory/25 px-8 py-4 text-sm tracking-wide text-ivory transition-colors hover:border-accent hover:text-accent sm:w-auto"
         >
           Explore The Human Paradox

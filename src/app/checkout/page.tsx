@@ -28,31 +28,40 @@ export default function CheckoutPage() {
     <>
       <Navbar />
       <main id="main" className="pt-16 sm:pt-[4.5rem]">
-        <div className="shell section-pad grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start xl:gap-20">
-          <div className="min-w-0">
-            <p className="text-[11px] tracking-[0.2em] text-accent sm:text-xs sm:tracking-[0.28em]">
-              CHECKOUT — FIRST RELEASE
-            </p>
-            <h1 className="serif-display mt-4 max-w-xl text-[clamp(2rem,4.5vw+1rem,3.25rem)] leading-[1.1] font-light text-ivory">
-              {PRODUCT.title}
-            </h1>
-            <div className="mt-8 w-full max-w-[280px] sm:max-w-[320px]">
-              <EbookCover />
-            </div>
-            <p className="mt-8 max-w-xl leading-relaxed text-muted">
-              Explore the patterns of thought, inner conflicts, and mental
-              habits that shape how you experience yourself and the world
-              around you.
-            </p>
-            <p className="serif-display mt-6 text-4xl text-ivory">
-              {freeMode ? "Free" : PRODUCT.priceLabel}
-              <span className="ml-3 align-middle font-sans text-xs tracking-[0.2em] text-faint">
-                {freeMode ? "DIGITAL PDF · FREE RELEASE" : "ONE-TIME · DIGITAL PDF"}
-              </span>
-            </p>
-          </div>
+        {/*
+          Mobile-first ordering: the title stays at the top, then the email
+          form appears immediately. Cover art and the long description follow
+          below it on small screens, so nobody has to scroll to find the
+          input. From `lg` up the original two-column editorial layout
+          (details left, form right) is preserved.
+        */}
+        <div className="shell pt-8 pb-16 sm:pt-10 sm:pb-20 lg:py-[clamp(4rem,9vh+2rem,8rem)]">
+          <p className="text-[11px] tracking-[0.2em] text-accent sm:text-xs sm:tracking-[0.28em]">
+            CHECKOUT — FIRST RELEASE
+          </p>
+          <h1 className="serif-display mt-3 max-w-xl text-[clamp(1.9rem,5vw+0.75rem,3.25rem)] leading-[1.12] font-light text-ivory sm:mt-4 sm:leading-[1.1]">
+            {PRODUCT.title}
+          </h1>
 
-          <div className="min-w-0 border border-ink-line bg-ink-soft p-6 sm:p-10">
+          <div className="mt-6 grid gap-8 sm:mt-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start lg:gap-12 xl:gap-20">
+            <div className="order-2 min-w-0 lg:order-1">
+              <div className="w-full max-w-[240px] sm:max-w-[320px]">
+                <EbookCover />
+              </div>
+              <p className="mt-6 max-w-xl leading-relaxed text-muted sm:mt-8">
+                Explore the patterns of thought, inner conflicts, and mental
+                habits that shape how you experience yourself and the world
+                around you.
+              </p>
+              <p className="serif-display mt-5 text-3xl text-ivory sm:mt-6 sm:text-4xl">
+                {freeMode ? "Free" : PRODUCT.priceLabel}
+                <span className="ml-3 align-middle font-sans text-xs tracking-[0.2em] text-faint">
+                  {freeMode ? "DIGITAL PDF · FREE RELEASE" : "ONE-TIME · DIGITAL PDF"}
+                </span>
+              </p>
+            </div>
+
+            <div className="order-1 min-w-0 border border-ink-line bg-ink-soft p-5 sm:p-8 lg:order-2 lg:p-10">
             {claimAvailable ? (
               <>
                 <h2 className="serif-display text-2xl font-normal text-ivory">
@@ -102,6 +111,7 @@ export default function CheckoutPage() {
                 <RecoverLinkForm />
               </div>
             )}
+            </div>
           </div>
         </div>
       </main>

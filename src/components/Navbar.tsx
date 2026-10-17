@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { NAV_LINKS, SITE } from "@/config/site";
+import { NAV_LINKS, SECTION_LINKS, SITE } from "@/config/site";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -13,7 +13,7 @@ export default function Navbar() {
         className="shell flex h-16 min-h-[4rem] items-center justify-between gap-4 sm:h-[4.5rem]"
       >
         <a
-          href="#home"
+          href={SECTION_LINKS.home}
           className="min-w-0 flex-1 truncate text-xs font-semibold tracking-[0.18em] text-ivory sm:flex-none sm:text-[13px] sm:tracking-[0.22em]"
         >
           {SITE.wordmark}
@@ -34,7 +34,7 @@ export default function Navbar() {
 
         <div className="hidden md:block">
           <a
-            href="#ebook"
+            href={SECTION_LINKS.ebook}
             className="inline-flex items-center border border-ivory/25 px-5 py-2.5 text-sm text-ivory transition-colors hover:border-accent hover:text-accent"
           >
             Explore the Ebook
@@ -80,7 +80,7 @@ export default function Navbar() {
             ))}
             <li className="pt-2">
               <a
-                href="#ebook"
+                href={SECTION_LINKS.ebook}
                 onClick={() => setOpen(false)}
                 className="flex min-h-[48px] items-center justify-center border border-ivory/25 px-5 py-3 text-center text-sm text-ivory"
               >

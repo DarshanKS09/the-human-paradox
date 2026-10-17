@@ -1,6 +1,10 @@
 export default function About() {
   return (
-    <section id="about" aria-labelledby="about-heading" className="scroll-mt-16">
+    <section
+      id="about"
+      aria-labelledby="about-heading"
+      className="scroll-mt-16 sm:scroll-mt-[4.5rem]"
+    >
       <div className="shell section-pad grid gap-10 md:grid-cols-[0.9fr_1.1fr] lg:grid-cols-[0.8fr_1.2fr] xl:gap-16">
         <div className="min-w-0">
           <p className="text-[11px] tracking-[0.2em] text-accent sm:text-xs sm:tracking-[0.28em]">
