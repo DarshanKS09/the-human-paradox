@@ -3,10 +3,11 @@
 import { useState } from "react";
 
 /**
- * Recovery form. In FREE mode it re-runs the free claim for the address;
- * in PAID mode it re-issues the paid download link.
+ * Paid-mode recovery form: re-issues a protected download link for a
+ * verified purchase. Not rendered in FREE mode (the free claim flow is a
+ * single form).
  */
-export default function RecoverLinkForm({ freeMode = false }: { freeMode?: boolean }) {
+export default function RecoverLinkForm() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -16,14 +17,11 @@ export default function RecoverLinkForm({ freeMode = false }: { freeMode?: boole
     if (busy) return;
     setBusy(true);
     try {
-      await fetch(
-        freeMode ? "/api/free/claim" : "/api/download/request-link",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email.trim() }),
-        }
-      );
+      await fetch("/api/download/request-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
     } catch {
       // Generic message below covers network failure too.
     } finally {
@@ -35,9 +33,8 @@ export default function RecoverLinkForm({ freeMode = false }: { freeMode?: boole
   if (done) {
     return (
       <p role="status" className="mt-4 text-sm leading-relaxed text-muted">
-        {freeMode
-          ? "If that address matches a previous request, a fresh link has been prepared. Please check your inbox and spam folder."
-          : "If a completed purchase exists for this email address, a fresh download link is on its way. Please also check your spam folder."}
+        If a completed purchase exists for this email address, a fresh download
+        link is on its way. Please also check your spam folder.
       </p>
     );
   }

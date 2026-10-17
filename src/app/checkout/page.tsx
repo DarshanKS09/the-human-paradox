@@ -9,8 +9,8 @@ import { getServerConfig } from "@/lib/config";
 import { PRODUCT } from "@/lib/product";
 
 export const metadata: Metadata = {
-  title: "Checkout",
-  description: `Purchase "${PRODUCT.title}" securely. Immediate digital delivery after payment.`,
+  title: "Get Your Free Copy",
+  description: `Get "${PRODUCT.title}" free. Enter your email and we will send the download link straight away. No payment, no account.`,
 };
 
 export default function CheckoutPage() {
@@ -56,14 +56,14 @@ export default function CheckoutPage() {
             {claimAvailable ? (
               <>
                 <h2 className="serif-display text-2xl font-normal text-ivory">
-                  {freeMode ? "Get your free copy" : "Complete your purchase"}
+                  {freeMode ? "Get Your Free Copy" : "Complete your purchase"}
                 </h2>
                 <p className="mt-3 text-sm leading-relaxed text-muted">
                   {freeMode ? (
                     <>
-                      This ebook is currently free. Enter your email address
-                      and we will send your download link right away. No
-                      payment, no account — just your copy.
+                      This ebook is free. Enter your email address and we will
+                      email you the download link right away. No payment, no
+                      account — just your copy.
                     </>
                   ) : (
                     <>
@@ -90,19 +90,18 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <div className="mt-10 border-t border-ink-line pt-8">
-              <h3 className="text-sm font-medium text-ivory">
-                {freeMode
-                  ? "Already requested? Get a fresh download link"
-                  : "Already purchased? Get a fresh download link"}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                {freeMode
-                  ? "Enter the same email address and we will send a new time-limited link."
-                  : "Enter the email address you purchased with and we will send a new time-limited link if your purchase is verified."}
-              </p>
-              <RecoverLinkForm freeMode={freeMode} />
-            </div>
+            {!freeMode && (
+              <div className="mt-10 border-t border-ink-line pt-8">
+                <h3 className="text-sm font-medium text-ivory">
+                  Already purchased? Get a fresh download link
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  Enter the email address you purchased with and we will send
+                  a new time-limited link if your purchase is verified.
+                </p>
+                <RecoverLinkForm />
+              </div>
+            )}
           </div>
         </div>
       </main>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerConfig } from "@/lib/config";
 import { getFreeClaimStore, jsonError, rateLimitOr429 } from "@/lib/http";
 import { claimFreeEbook, FreeClaimInputError } from "@/lib/free-claim";
+import { ClaimStorageError } from "@/lib/free-claims";
 
 /**
  * FREE distribution mode claim endpoint.
@@ -73,6 +74,18 @@ export async function POST(req: Request) {
   } catch (err) {
     if (err instanceof FreeClaimInputError) {
       return jsonError(400, err.code, err.message);
+    }
+    if (err instanceof ClaimStorageError) {
+      // Durable storage is missing/unwritable (typical on serverless).
+      // Report an actionable, non-technical state — never a fake success.
+      console.warn(
+        JSON.stringify({ msg: "free claim storage unavailable", code: err.code })
+      );
+      return jsonError(
+        503,
+        err.code,
+        "We could not save your request right now. Please try again shortly."
+      );
     }
     // Never leak internals.
     return jsonError(

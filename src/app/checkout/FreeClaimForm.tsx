@@ -56,8 +56,10 @@ export default function FreeClaimForm() {
           ? (body.message ?? "Enter a valid email address.")
           : body.code === "EBOOK_UNAVAILABLE"
             ? "The ebook link is not available right now. Please try again shortly."
-            : (body.message ??
-              "We could not prepare your copy right now. Please try again in a moment.")
+            : body.code === "CLAIM_STORAGE_UNAVAILABLE"
+              ? "We could not save your request right now. Please try again in a few minutes."
+              : (body.message ??
+                "We could not send your ebook right now. Please try again in a moment.")
       );
     } catch {
       setStatus("error");
@@ -107,7 +109,7 @@ export default function FreeClaimForm() {
         disabled={status === "sending"}
         className="inline-flex min-h-[48px] w-full items-center justify-center bg-ivory px-8 py-4 text-sm font-medium tracking-wide text-ink transition-colors hover:bg-accent disabled:opacity-60 sm:w-auto"
       >
-        {status === "sending" ? "Preparing your copy…" : "Get My Free Ebook"}
+        {status === "sending" ? "Sending…" : "Send Me the Free Ebook"}
       </button>
     </form>
   );

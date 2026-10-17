@@ -1,8 +1,12 @@
 import EbookCover from "./EbookCover";
 import PurchaseButton from "./PurchaseButton";
 import { EBOOK } from "@/config/site";
+import { getServerConfig } from "@/lib/config";
 
 export default function EbookSection() {
+  // FREE mode must never advertise a price; PAID mode keeps ₹49.
+  const freeMode = getServerConfig().distributionMode === "FREE";
+
   return (
     <section
       id="ebook"
@@ -55,9 +59,9 @@ export default function EbookSection() {
 
           <div className="mt-10 flex flex-wrap items-center gap-6 border-t border-ink-line pt-8">
             <p className="serif-display text-[clamp(2rem,3vw+1.25rem,2.5rem)] text-ivory">
-              {EBOOK.price}
+              {freeMode ? "Free" : EBOOK.price}
               <span className="ml-3 align-middle font-sans text-xs tracking-[0.2em] text-faint">
-                ONE-TIME · DIGITAL
+                {freeMode ? "DIGITAL · FREE RELEASE" : "ONE-TIME · DIGITAL"}
               </span>
             </p>
           </div>

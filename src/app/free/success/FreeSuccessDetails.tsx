@@ -84,7 +84,9 @@ export default function FreeSuccessDetails() {
         YOUR COPY
       </p>
       <h1 className="serif-display mt-4 text-[clamp(2rem,5vw+1rem,3rem)] leading-tight font-light text-ivory">
-        Your ebook is ready.
+        {status.emailSent
+          ? "Your ebook is on its way."
+          : "We couldn't send the email just now."}
       </h1>
       <p className="mt-4 text-lg text-muted">
         Your Mind Is Not Your Enemy — Free
@@ -101,8 +103,8 @@ export default function FreeSuccessDetails() {
       <div className="mt-8 border-t border-ink-line pt-6 text-left text-sm leading-relaxed text-muted">
         <p>
           {status.emailSent
-            ? "We have also emailed this link to your address. If it has not arrived within a few minutes, please check your spam folder — the button above works regardless."
-            : "We could not send the email just now, but the button above is ready to use. If you need the link again, return to the checkout page with the same email address."}
+            ? "We have emailed this link to your address. If it has not arrived within a few minutes, please check your spam folder — the button above works regardless."
+            : "Your download button above works right now, but our email provider did not accept the message. Please try again in a few minutes, or contact us and we will help."}
         </p>
         <p className="mt-2 text-faint">
           The file is hosted on Google Drive and opens in a new tab. The link is

@@ -11,7 +11,7 @@ or override it.
 
 | Value | Behaviour |
 |---|---|
-| `FREE` (default when unset or unrecognized) | Free claim flow. Email address → "Get My Free Ebook" → confirmation page with a download button + emailed link. **No payment order is created, required, or simulated.** |
+| `FREE` (default when unset or unrecognized) | Free claim flow: one email form ("Get Your Free Copy" → "Send Me the Free Ebook") → confirmation page with a "Download Your Ebook" button (Google Drive, new tab) plus the emailed link. **No payment order is created, required, or simulated.** |
 | `PAID` | Razorpay checkout at the server price (₹49 / 4900 paise INR), signature + gateway verification, webhook reconciliation, paid fulfillment. |
 
 Safety properties:
@@ -172,6 +172,7 @@ Symptom → cause → fix:
 | Email arrives but the Drive link won't open | Drive file is not shared publicly | Drive → Share → Anyone with the link → Viewer |
 | Emailed link points at `localhost` | `APP_BASE_URL` unset | Set `APP_BASE_URL=https://your-domain` |
 | Claims vanish after a deploy | No durable storage | Set `KV_REST_API_URL` + `KV_REST_API_TOKEN` |
+| Claim returns `503 CLAIM_STORAGE_UNAVAILABLE` | Claims cannot be persisted (read-only filesystem on Vercel with no KV) | Set `KV_REST_API_URL` + `KV_REST_API_TOKEN`; confirm `claimStorageUsable: true` in `/api/health` |
 | Checkout says "download link has not been configured" | `EBOOK_DRIVE_URL` unset/invalid | Set it (FREE mode) |
 
 Claims **fail closed by design**: if the delivery link is missing or invalid, no
@@ -201,7 +202,7 @@ EMAIL_FROM="The Human Paradox <hello@yourdomain.com>"
 npm run dev
 ```
 
-1. Open `http://localhost:3000/checkout` → "Get My Free Ebook".
+1. Open `http://localhost:3000/checkout` → "Get Your Free Copy", then click "Send Me the Free Ebook". The checkout page has a single email form; to request a fresh link later, submit the same address again.
 2. Enter an invalid email → inline validation, no request sent.
 3. Enter a valid email → redirected to `/free/success` with a working
    "Download Your Ebook" button.
@@ -222,7 +223,8 @@ npm run dev
 
 - [ ] Decide `DISTRIBUTION_MODE` for launch (FREE is the safe default).
 - [ ] **Durable storage on Vercel:** `KV_REST_API_URL` + `KV_REST_API_TOKEN`
-      configured; otherwise free claims are lost on redeploy.
+      configured; otherwise free claims cannot be saved at all
+      (503 CLAIM_STORAGE_UNAVAILABLE) and would be lost on redeploy.
 - [ ] FREE mode: `EBOOK_DRIVE_URL` set to a Drive file shared
       "Anyone with the link", and `DOWNLOAD_TOKEN_SECRET` + `APP_BASE_URL`
       set. No local PDF is required in the deployment.

@@ -30,6 +30,25 @@ export function generateClaimId(): string {
   return `clm_${randomBytes(16).toString("hex")}`;
 }
 
+/**
+ * Raised when claim records cannot be persisted (read-only or missing
+ * storage). Surfaces as a clear configuration problem instead of an
+ * opaque 500, which is what happens on serverless deployments where the
+ * local filesystem cannot be written to.
+ */
+export class ClaimStorageError extends Error {
+  readonly code: string;
+  constructor(cause: unknown) {
+    const osCode =
+      typeof cause === "object" && cause !== null && "code" in cause
+        ? String((cause as { code: unknown }).code)
+        : "UNKNOWN";
+    super(`Claim storage unavailable (${osCode})`);
+    this.name = "ClaimStorageError";
+    this.code = "CLAIM_STORAGE_UNAVAILABLE";
+  }
+}
+
 export function isValidClaimId(value: unknown): boolean {
   return typeof value === "string" && /^clm_[0-9a-f]{32}$/.test(value);
 }
@@ -72,22 +91,29 @@ function createFileStore(dbPath: string): FreeClaimStore {
       if ((err as NodeJS.ErrnoException)?.code === "ENOENT") {
         return { version: 1, byEmail: {}, byId: {} };
       }
-      throw err;
+      // EACCES/EROFS/EISDIR → the deployment cannot persist records.
+      throw new ClaimStorageError(err);
     }
   }
   function save(db: FileShape): void {
-    mkdirSync(dirname(dbPath), { recursive: true });
-    const tmp = `${dbPath}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify(db), "utf8");
-    renameSync(tmp, dbPath);
+    try {
+      mkdirSync(dirname(dbPath), { recursive: true });
+      const tmp = `${dbPath}.${process.pid}.tmp`;
+      writeFileSync(tmp, JSON.stringify(db), "utf8");
+      renameSync(tmp, dbPath);
+    } catch (err) {
+      throw new ClaimStorageError(err);
+    }
   }
   return {
-    claimForEmail(email, nowMs) {
+    // async so storage failures surface as rejections (not sync throws),
+    // which callers handle uniformly.
+    async claimForEmail(email, nowMs) {
       // Synchronous fs ops cannot interleave on the Node event loop.
       const db = load();
       const key = claimEmailKey(email);
       const existing = db.byEmail[key];
-      if (existing) return Promise.resolve({ claim: { ...existing }, created: false });
+      if (existing) return { claim: { ...existing }, created: false };
       const claim: FreeClaim = {
         id: generateClaimId(),
         email: email.trim().toLowerCase(),
@@ -104,18 +130,18 @@ function createFileStore(dbPath: string): FreeClaimStore {
       db.byEmail[key] = claim;
       db.byId[claim.id] = claim;
       save(db);
-      return Promise.resolve({ claim: { ...claim }, created: true });
+      return { claim: { ...claim }, created: true };
     },
-    getById(id) {
+    async getById(id) {
       const found = load().byId[id];
-      return Promise.resolve(found ? { ...found } : null);
+      return found ? { ...found } : null;
     },
-    save(claim) {
+    async save(claim) {
       const db = load();
       db.byEmail[claimEmailKey(claim.email)] = claim;
       db.byId[claim.id] = claim;
       save(db);
-      return Promise.resolve({ ...claim });
+      return { ...claim };
     },
   };
 }
