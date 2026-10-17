@@ -29,6 +29,16 @@ export async function POST(req: Request) {
     );
   }
 
+  // Fail closed: never mint a receipt or send an email when the delivery
+  // link is missing or malformed, so nobody receives a broken link.
+  if (!cfg.ebookDriveUrl) {
+    return jsonError(
+      503,
+      "EBOOK_UNAVAILABLE",
+      "The ebook download link is not configured yet. Please check back shortly."
+    );
+  }
+
   let body: { email?: unknown };
   try {
     body = (await req.json()) as { email?: unknown };
@@ -43,6 +53,7 @@ export async function POST(req: Request) {
         downloadTokenSecret: cfg.downloadTokenSecret,
         linkTtlSeconds: cfg.freeLinkTtlHours * 3600,
         appBaseUrl: cfg.appBaseUrl,
+        driveUrl: cfg.ebookDriveUrl,
         smtp: cfg.smtp,
         emailFrom: cfg.emailFrom,
         cooldownMinutes: cfg.freeEmailCooldownMinutes,
@@ -54,8 +65,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       claimId: result.claimId,
-      downloadToken: result.downloadToken,
-      downloadExpiresAt: result.downloadExpiresAt,
+      receiptToken: result.downloadToken,
+      driveUrl: result.driveUrl,
       emailSent: result.emailSent,
       emailStatus: result.emailStatus,
     });

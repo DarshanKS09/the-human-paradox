@@ -1,4 +1,5 @@
 import { createReadStream, statSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { getServerConfig } from "./config";
 
@@ -24,6 +25,82 @@ export class EbookUnavailableError extends Error {
     super("EBOOK_UNAVAILABLE");
     this.name = "EbookUnavailableError";
   }
+}
+
+export interface EbookAvailability {
+  available: boolean;
+  /** Where the file is expected, for diagnostics only. */
+  resolvedPath: string;
+  source: "remote" | "file" | "none";
+}
+
+/**
+ * Resolves the local PDF path against the process working directory, which
+ * is the project root for `next dev` / `next start`. Returns null when the
+ * file is absent.
+ */
+export function resolveLocalEbookPath(): string | null {
+  const configured = getServerConfig().ebookPdfPath;
+  const absolute = isAbsolute(configured)
+    ? configured
+    : resolve(process.cwd(), configured);
+  try {
+    const stat = statSync(absolute);
+    return stat.isFile() && stat.size > 0 ? absolute : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks whether the ebook can actually be served, so the claim flow can
+ * fail closed instead of emailing a link that would 503.
+ */
+/**
+ * Synchronous variant for server components that cannot await (rendering
+ * the checkout page). Ignores remote storage and reports local-file state.
+ */
+export function checkEbookAvailabilitySync(): EbookAvailability {
+  const cfg = getServerConfig();
+  const resolvedPath = isAbsolute(cfg.ebookPdfPath)
+    ? cfg.ebookPdfPath
+    : resolve(process.cwd(), cfg.ebookPdfPath);
+  const local = resolveLocalEbookPath();
+  if (local) return { available: true, resolvedPath: local, source: "file" };
+  if (cfg.ebookPdfUrl) {
+    // A remote URL may still be valid; assume yes and let the claim route
+    // verify for real before sending anything.
+    return { available: true, resolvedPath, source: "remote" };
+  }
+  return { available: false, resolvedPath, source: "none" };
+}
+
+export async function checkEbookAvailability(
+  fetchImpl: typeof fetch = fetch
+): Promise<EbookAvailability> {
+  const cfg = getServerConfig();
+  const resolvedPath = isAbsolute(cfg.ebookPdfPath)
+    ? cfg.ebookPdfPath
+    : resolve(process.cwd(), cfg.ebookPdfPath);
+
+  if (cfg.ebookPdfUrl) {
+    try {
+      const res = await fetchImpl(cfg.ebookPdfUrl, {
+        method: "HEAD",
+        headers: cfg.ebookPdfToken
+          ? { Authorization: `Bearer ${cfg.ebookPdfToken}` }
+          : undefined,
+        cache: "no-store",
+      });
+      if (res.ok) return { available: true, resolvedPath, source: "remote" };
+    } catch {
+      // fall through to the local check below
+    }
+  }
+
+  const local = resolveLocalEbookPath();
+  if (local) return { available: true, resolvedPath: local, source: "file" };
+  return { available: false, resolvedPath, source: "none" };
 }
 
 export async function readEbookPdf(

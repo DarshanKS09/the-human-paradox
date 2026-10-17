@@ -43,7 +43,7 @@ export async function GET(
     ok: true,
     claimId: claim.id,
     emailSent: claim.emailError === null && claim.emailCount > 0,
-    downloadExpiresAt: claim.tokenExpiresAt,
-    downloadsRemaining: Math.max(0, cfg.freeMaxDownloadsPerClaim - claim.downloadCount),
+    // The file is served by Google Drive; the link is not per-customer.
+    driveUrl: cfg.ebookDriveUrl,
   });
 }

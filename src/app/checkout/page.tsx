@@ -18,8 +18,10 @@ export default function CheckoutPage() {
   const freeMode = cfg.distributionMode === "FREE";
   // In FREE mode there is no payment to make, so no gateway credentials
   // are required to offer the claim flow.
+  // FREE delivery needs a validated Drive link + token signing; PAID delivery
+  // additionally needs a reachable PDF. Only offer what can actually work.
   const claimAvailable = freeMode
-    ? cfg.downloadTokenSecret !== null
+    ? cfg.downloadTokenSecret !== null && cfg.ebookDriveUrl !== null
     : cfg.payments !== null && cfg.downloadTokenSecret !== null;
 
   return (
@@ -80,7 +82,9 @@ export default function CheckoutPage() {
                 </h2>
                 <p className="mt-3 text-sm leading-relaxed text-muted">
                   {freeMode
-                    ? "Free ebook delivery is being set up. Please try again shortly — no payment is involved."
+                    ? cfg.ebookDriveUrl
+                      ? "Free ebook delivery is being set up. Please try again shortly — no payment is involved."
+                      : "Free ebook delivery is almost ready. The download link has not been configured yet — please check back shortly."
                     : "Online payments for this ebook are not live yet. Purchasing will be available soon — thank you for your patience. No payment is possible on this page right now, and no demo or simulated checkout is offered."}
                 </p>
               </div>

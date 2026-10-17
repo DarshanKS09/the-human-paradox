@@ -28,6 +28,8 @@ export interface FreeClaimDeps {
   downloadTokenSecret: string;
   linkTtlSeconds: number;
   appBaseUrl: string;
+  /** Validated Google Drive share link (FREE delivery). */
+  driveUrl: string;
   smtp: SmtpConfig | null;
   emailFrom: string;
   cooldownMinutes: number;
@@ -38,9 +40,13 @@ export interface FreeClaimDeps {
 
 export interface FreeClaimResult {
   claimId: string;
+  /**
+   * Receipt token authorizing the claim-status lookup. In FREE mode the
+   * file itself is served by Google Drive, so this token does NOT gate file
+   * access — the Drive link is public to anyone who has it.
+   */
   downloadToken: string;
-  downloadUrl: string;
-  downloadExpiresAt: string;
+  driveUrl: string;
   emailSent: boolean;
   emailAttempted: boolean;
   /** Stable, safe code the UI can explain to the user. */
@@ -86,7 +92,8 @@ export async function claimFreeEbook(
   const nowMs = deps.nowMs ?? Date.now();
   const { claim } = await deps.store.claimForEmail(email, nowMs);
 
-  // Reuse a still-valid link rather than minting unlimited ones.
+  // Receipt token for the claim-status lookup only. The ebook itself is
+  // delivered from Google Drive, so this token gates no file access.
   const token =
     tokenStillValid(claim, nowMs) && claim.downloadToken
       ? claim.downloadToken
@@ -100,7 +107,7 @@ export async function claimFreeEbook(
   const expiresAtIso = new Date(
     Math.floor(nowMs / 1000) * 1000 + deps.linkTtlSeconds * 1000
   ).toISOString();
-  const downloadUrl = `${deps.appBaseUrl}/api/download/${token}`;
+  const driveUrl = deps.driveUrl;
 
   const cooldownMs = deps.cooldownMinutes * 60_000;
   const dayMs = 24 * 60 * 60_000;
@@ -132,8 +139,9 @@ export async function claimFreeEbook(
       await sendDownloadEmail(
         {
           to: claim.email,
-          downloadUrl,
-          expiresAtIso,
+          downloadUrl: driveUrl,
+          expiresAtIso: null,
+          delivery: "drive",
           smtp: deps.smtp,
           emailFrom: deps.emailFrom,
         },
@@ -161,8 +169,7 @@ export async function claimFreeEbook(
   return {
     claimId: saved.id,
     downloadToken: token,
-    downloadUrl,
-    downloadExpiresAt: expiresAtIso,
+    driveUrl,
     emailSent,
     emailAttempted,
     emailStatus,

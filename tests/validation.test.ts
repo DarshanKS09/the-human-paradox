@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { normalizeEmailFrom } from "@/lib/config";
 import {
   isValidEmail,
   isValidOrderId,
@@ -29,6 +30,43 @@ describe("input validation", () => {
   it("masks emails for display", () => {
     expect(maskEmail("reader@example.com")).toBe("r***@example.com");
     expect(maskEmail("broken")).toBe("***");
+  });
+});
+
+describe("email sender formatting", () => {
+  const BRAND = "The Human Paradox";
+
+  it("adds the brand name when only a bare address is configured", () => {
+    expect(normalizeEmailFrom("someone@gmail.com", BRAND)).toBe(
+      "The Human Paradox <someone@gmail.com>"
+    );
+  });
+
+  it("keeps an explicitly configured display name", () => {
+    expect(normalizeEmailFrom("Custom Name <a@b.com>", BRAND)).toBe(
+      "Custom Name <a@b.com>"
+    );
+  });
+
+  it("falls back to a branded sender when unset or empty", () => {
+    expect(normalizeEmailFrom(null, BRAND)).toBe(
+      "The Human Paradox <hello@example.com>"
+    );
+    expect(normalizeEmailFrom("   ", BRAND)).toBe(
+      "The Human Paradox <hello@example.com>"
+    );
+  });
+
+  it("strips a mailto: prefix and trims whitespace", () => {
+    expect(normalizeEmailFrom("  mailto:a@b.com  ", BRAND)).toBe(
+      "The Human Paradox <a@b.com>"
+    );
+  });
+
+  it("never leaves the sender without a display name", () => {
+    for (const input of ["a@b.com", "mailto:a@b.com", null, ""]) {
+      expect(normalizeEmailFrom(input, BRAND)).toMatch(/^The Human Paradox </);
+    }
   });
 });
 

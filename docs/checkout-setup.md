@@ -117,6 +117,71 @@ shape) and swap `getStore()` in `src/lib/http.ts`. Suggested table:
 `orders(id PK, data JSONB, gateway_order_id UNIQUE, ...)`. No database
 migration has been applied — there is no database yet.
 
+## 6. Free delivery (Google Drive)
+
+In FREE mode the ebook is delivered as a **Google Drive share link**, so no
+file needs to exist in the deployment.
+
+1. Upload the finished ebook to Google Drive.
+2. Share it: **Anyone with the link → Viewer** (this is what makes the link
+   openable by visitors).
+3. Copy the link — it must look like
+   `https://drive.google.com/file/d/<FILE_ID>/view?usp=sharing` — and set:
+
+   ```bash
+   EBOOK_DRIVE_URL=https://drive.google.com/file/d/<FILE_ID>/view?usp=sharing
+   ```
+
+The link is validated server-side: only `https` `drive.google.com` URLs with a
+file id are accepted. If it is missing or invalid, `/api/free/claim` returns
+`503 EBOOK_UNAVAILABLE`, **no email is sent**, and the checkout page shows a
+configuration notice rather than a broken button.
+
+### What this changes about security
+
+- The link is **public**: anyone who has it can download the ebook, and it
+  cannot be revoked per customer or protected from re-sharing. We ask readers
+  not to re-share it, but we cannot enforce that.
+- Per-customer, expiring, token-protected downloads are **no longer used for
+  free delivery**. The signed receipt token still authorizes the claim-status
+  lookup only — it does not gate the file.
+- Abuse controls that remain: server-side email validation, 5 claims/minute per
+  IP, one claim per email address, email cooldown, and a per-address daily
+  email cap.
+- PAID mode is untouched and still uses the protected `/api/download/<token>`
+  endpoint with `EBOOK_PDF_PATH` / `EBOOK_PDF_URL`.
+
+## 6a. Troubleshooting ebook delivery (`/api/health`)
+
+`GET /api/health` returns deployment readiness as booleans only — no secrets,
+no customer data, no tokens:
+
+```json
+{ "distributionMode": "FREE", "checks": {
+  "tokenSigningConfigured": true, "smtpConfigured": true,
+  "ebookAvailable": true, "ebookSource": "remote",
+  "durableClaimStorage": true, "appBaseUrlConfigured": true } }
+```
+
+Symptom → cause → fix:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Claim returns `503 DELIVERY_UNAVAILABLE` | `DOWNLOAD_TOKEN_SECRET` missing | Set it (32+ random bytes) |
+| Claim returns `503 EBOOK_UNAVAILABLE` | `EBOOK_DRIVE_URL` missing or not a valid Drive link | Set `EBOOK_DRIVE_URL` (see section 6) and ensure the Drive file is shared "Anyone with the link" |
+| Email arrives but the Drive link won't open | Drive file is not shared publicly | Drive → Share → Anyone with the link → Viewer |
+| Emailed link points at `localhost` | `APP_BASE_URL` unset | Set `APP_BASE_URL=https://your-domain` |
+| Claims vanish after a deploy | No durable storage | Set `KV_REST_API_URL` + `KV_REST_API_TOKEN` |
+| Checkout says "download link has not been configured" | `EBOOK_DRIVE_URL` unset/invalid | Set it (FREE mode) |
+
+Claims **fail closed by design**: if the delivery link is missing or invalid, no
+receipt is minted and no email is sent, so nobody receives a dead link.
+
+In FREE mode `ebookAvailable` / `ebookSource` report `null` — they describe the
+PAID-mode PDF sources and are irrelevant to Google Drive delivery. Use
+`driveLinkConfigured` for FREE and `ebookDelivery` to see which mechanism is
+active.
+
 ## 7. Test the free ebook claim
 
 ```bash
@@ -124,7 +189,7 @@ migration has been applied — there is no database yet.
 DISTRIBUTION_MODE=FREE
 DOWNLOAD_TOKEN_SECRET=<random 32+ bytes>
 APP_BASE_URL=http://localhost:3000
-EBOOK_PDF_PATH=./private/ebook.pdf      # any PDF works for local testing
+EBOOK_DRIVE_URL=https://drive.google.com/file/d/<FILE_ID>/view?usp=sharing
 SMTP_HOST=smtp-relay.brevo.com          # optional: without it the download
 SMTP_PORT=587                           # button still works, email does not
 SMTP_USER=...
@@ -157,8 +222,10 @@ npm run dev
 
 - [ ] Decide `DISTRIBUTION_MODE` for launch (FREE is the safe default).
 - [ ] **Durable storage on Vercel:** `KV_REST_API_URL` + `KV_REST_API_TOKEN`
-      configured; ebook in private object storage via `EBOOK_PDF_URL`.
-      Without these, free claims and the PDF will be lost/reset on deploy.
+      configured; otherwise free claims are lost on redeploy.
+- [ ] FREE mode: `EBOOK_DRIVE_URL` set to a Drive file shared
+      "Anyone with the link", and `DOWNLOAD_TOKEN_SECRET` + `APP_BASE_URL`
+      set. No local PDF is required in the deployment.
 - [ ] Brevo account + verified sender; SMTP credentials and `EMAIL_FROM` set;
       one real test email received (delivery is not otherwise verifiable).
 - [ ] `APP_BASE_URL` set to the production domain; HTTPS.

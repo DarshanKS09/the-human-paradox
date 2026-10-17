@@ -7,8 +7,7 @@ interface ClaimStatus {
   ok: boolean;
   code?: string;
   emailSent?: boolean;
-  downloadExpiresAt?: string | null;
-  downloadsRemaining?: number;
+  driveUrl?: string | null;
 }
 
 /**
@@ -91,7 +90,10 @@ export default function FreeSuccessDetails() {
         Your Mind Is Not Your Enemy — Free
       </p>
       <a
-        href={`/api/download/${encodeURIComponent(token)}`}
+        href={status.driveUrl ?? "#"}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-disabled={!status.driveUrl}
         className="mt-8 inline-flex min-h-[48px] w-full items-center justify-center bg-ivory px-8 py-4 text-sm font-medium tracking-wide text-ink transition-colors hover:bg-accent sm:w-auto"
       >
         Download Your Ebook
@@ -100,13 +102,12 @@ export default function FreeSuccessDetails() {
         <p>
           {status.emailSent
             ? "We have also emailed this link to your address. If it has not arrived within a few minutes, please check your spam folder — the button above works regardless."
-            : "We could not send the email just now, but your download button above is ready to use. If the link expires later, return to the checkout page with the same email address to request a fresh one."}
+            : "We could not send the email just now, but the button above is ready to use. If you need the link again, return to the checkout page with the same email address."}
         </p>
-        {status.downloadExpiresAt && (
-          <p className="mt-2 text-faint">
-            This link is valid until {new Date(status.downloadExpiresAt).toLocaleString()}.
-          </p>
-        )}
+        <p className="mt-2 text-faint">
+          The file is hosted on Google Drive and opens in a new tab. The link is
+          not password protected, so please avoid re-sharing it.
+        </p>
       </div>
     </div>
   );

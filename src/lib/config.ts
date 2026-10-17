@@ -6,12 +6,64 @@
  * `rzp_test_*` = test mode, `rzp_live_*` = live mode.
  */
 import type { SmtpConfig } from "./email";
+import { PRODUCT } from "./product";
+
+/** Brand name used as the sender display name in transactional email. */
+const PRODUCT_BRAND = PRODUCT.brand;
 
 /** How the ebook is distributed. Server-side only; never client-selectable. */
 export type DistributionMode = "FREE" | "PAID";
 
 export function parseDistributionMode(value: string | null): DistributionMode {
   return String(value ?? "").trim().toUpperCase() === "PAID" ? "PAID" : "FREE";
+}
+
+/**
+ * Validates a Google Drive share link.
+ *
+ * Accepts the common share forms (https://drive.google.com/file/d/<id>/view,
+ * /open?id=<id>, or a direct https://drive.google.com/uc?export=download&id=<id>)
+ * and rejects anything else, so a malformed value can never be emailed.
+ */
+export function parseEbookDriveUrl(value: string | null): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:") return null;
+  const host = url.hostname.toLowerCase();
+  const driveHosts = ["drive.google.com", "www.drive.google.com"];
+  if (!driveHosts.includes(host)) return null;
+  const hasId =
+    /\/file\/d\/[A-Za-z0-9_-]{5,}/.test(url.pathname) ||
+    (url.searchParams.get("id") ?? "").length >= 5;
+  if (!hasId) return null;
+  return url.toString();
+}
+
+/**
+ * Ensures the sender always carries the brand display name, so recipients
+ * see "The Human Paradox" instead of the raw mailbox name.
+ *
+ * - "a@b.com"                      -> 'The Human Paradox <a@b.com>'
+ * - 'Brand <a@b.com>'               -> unchanged (explicit display name wins)
+ * - missing                        -> 'The Human Paradox <hello@example.com>'
+ */
+export function normalizeEmailFrom(
+  value: string | null,
+  brand: string,
+  fallbackAddress = "hello@example.com"
+): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return `${brand} <${fallbackAddress}>`;
+  // Already has an explicit display name.
+  if (/^[^<>]*<[^<>]+>$/.test(raw)) return raw;
+  const address = raw.replace(/^mailto:/i, "").trim();
+  return `${brand} <${address}>`;
 }
 
 export class ConfigError extends Error {
@@ -41,6 +93,12 @@ export interface ServerConfig {
   /** Private remote object storage (durable on serverless); null = local file. */
   ebookPdfUrl: string | null;
   ebookPdfToken: string | null;
+  /**
+   * Google Drive share link used for FREE delivery. Null when unset or
+   * invalid. NOTE: a Drive share link is public — anyone holding it can
+   * download the file.
+   */
+  ebookDriveUrl: string | null;
   /** Durable KV store (Upstash/Vercel KV REST). Null = local file store. */
   kvRestApiUrl: string | null;
   kvRestApiToken: string | null;
@@ -130,6 +188,7 @@ export function getServerConfig(): ServerConfig {
     ebookPdfPath: env("EBOOK_PDF_PATH") ?? "./private/ebook.pdf",
     ebookPdfUrl: env("EBOOK_PDF_URL"),
     ebookPdfToken: env("EBOOK_PDF_TOKEN"),
+    ebookDriveUrl: parseEbookDriveUrl(env("EBOOK_DRIVE_URL")),
     kvRestApiUrl: env("KV_REST_API_URL"),
     kvRestApiToken: env("KV_REST_API_TOKEN"),
     freeClaimsDbPath: env("FREE_CLAIMS_DB_PATH") ?? "./data/free-claims.json",
@@ -154,7 +213,7 @@ export function getServerConfig(): ServerConfig {
           }
         : null,
     smtpMissing,
-    emailFrom: env("EMAIL_FROM") ?? "The Human Paradox <hello@example.com>",
+    emailFrom: normalizeEmailFrom(env("EMAIL_FROM"), PRODUCT_BRAND),
     appBaseUrl: (env("APP_BASE_URL") ?? "http://localhost:3000").replace(
       /\/$/,
       ""

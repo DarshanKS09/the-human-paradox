@@ -1,11 +1,7 @@
 import { PRODUCT } from "@/lib/product";
 import { getServerConfig } from "@/lib/config";
-import { getFreeClaimStore, getStore, rateLimitOr429 } from "@/lib/http";
-import {
-  verifyToken,
-  PURPOSE_DOWNLOAD,
-  PURPOSE_FREE_DOWNLOAD,
-} from "@/lib/tokens";
+import { getStore, rateLimitOr429 } from "@/lib/http";
+import { verifyToken, PURPOSE_DOWNLOAD } from "@/lib/tokens";
 import { OrderTransitionError } from "@/lib/orders";
 import { readEbookPdf, EbookUnavailableError } from "@/lib/ebook-storage";
 
@@ -57,62 +53,19 @@ export async function GET(
     return htmlPage(503, "Unavailable", "Download unavailable.", "Digital delivery is still being set up. Please try again later.");
   }
 
-  const mode = cfg.distributionMode;
+  // FREE mode is delivered from Google Drive; this endpoint only serves the
+  // (dormant) PAID flow's protected PDF.
   const isPaidToken = verifyToken(cfg.downloadTokenSecret, PURPOSE_DOWNLOAD, token);
-  const isFreeToken = verifyToken(
-    cfg.downloadTokenSecret,
-    PURPOSE_FREE_DOWNLOAD,
-    token
-  );
-  if (!isPaidToken && !isFreeToken) {
+  if (!isPaidToken) {
     return htmlPage(
       410,
       "Link expired",
       "This download link has expired or is invalid.",
-      "If you already have the ebook, visit the checkout page and request a fresh download link with your email address."
+      "Free readers: request the ebook again from the checkout page."
     );
   }
 
-  const recordId = (isPaidToken ?? isFreeToken)?.orderId ?? "";
-
-  // FREE claim download
-  if (isFreeToken) {
-    if (mode !== "FREE") {
-      return htmlPage(403, "Not available", "This link is not available.", "Please request a fresh link from the checkout page.");
-    }
-    const claimStore = getFreeClaimStore();
-    const claim = await claimStore.getById(recordId);
-    if (!claim || claim.downloadToken !== token) {
-      return htmlPage(
-        410,
-        "Link expired",
-        "This link has been replaced by a newer one.",
-        "Please use the newest link you received, or visit the checkout page to request a fresh one."
-      );
-    }
-    if (claim.downloadCount >= cfg.freeMaxDownloadsPerClaim) {
-      return htmlPage(
-        410,
-        "Download limit reached",
-        "This link has reached its download limit.",
-        "Visit the checkout page and enter the same email address to request a fresh link."
-      );
-    }
-    claim.downloadCount += 1;
-    claim.updatedAt = new Date().toISOString();
-    await claimStore.save(claim);
-
-    const pdf = await serveEbook();
-    if (!pdf) {
-      return htmlPage(
-        503,
-        "Unavailable",
-        "The ebook file is not available right now.",
-        "Please try again shortly, or visit the checkout page to request a fresh link."
-      );
-    }
-    return pdf;
-  }
+  const recordId = isPaidToken.orderId;
 
   // PAID order download (existing secured flow, unchanged)
   const store = getStore();

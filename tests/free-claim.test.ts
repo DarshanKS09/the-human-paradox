@@ -15,6 +15,9 @@ const SMTP: SmtpConfig = {
   password: "pass",
 };
 
+const DRIVE_URL =
+  "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/view?usp=sharing";
+
 let dbPath = "";
 
 beforeEach(() => {
@@ -31,6 +34,7 @@ function deps(overrides: Record<string, unknown> = {}) {
     downloadTokenSecret: "free_secret_1234567890abcdef",
     linkTtlSeconds: 72 * 3600,
     appBaseUrl: "https://example.com",
+    driveUrl: DRIVE_URL,
     smtp: null,
     emailFrom: "The Human Paradox <hello@example.com>",
     cooldownMinutes: 10,
@@ -93,12 +97,13 @@ describe("free claim validation", () => {
   it("accepts and normalizes a valid email", async () => {
     const result = await claimFreeEbook(deps(), " Reader@Example.com ");
     expect(result.downloadToken.length).toBeGreaterThan(20);
-    expect(result.downloadUrl).toContain("/api/download/");
+    // Delivery is the Google Drive link, not a server download route.
+    expect(result.driveUrl).toBe(DRIVE_URL);
   });
 });
 
-describe("free claim grants protected access without payment", () => {
-  it("issues a signed, expiring download token and creates no order", async () => {
+describe("free claim delivers the Drive link without payment", () => {
+  it("issues a signed receipt token, returns the Drive link, and creates no order", async () => {
     const result = await claimFreeEbook(deps(), "reader@example.com");
 
     // Token is HMAC-signed and purpose-scoped.

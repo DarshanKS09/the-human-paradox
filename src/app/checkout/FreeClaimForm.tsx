@@ -40,13 +40,13 @@ export default function FreeClaimForm() {
       const body = (await res.json()) as {
         ok?: boolean;
         claimId?: string;
-        downloadToken?: string;
+        receiptToken?: string;
         code?: string;
         message?: string;
       };
-      if (res.ok && body.ok && body.claimId && body.downloadToken) {
+      if (res.ok && body.ok && body.claimId && body.receiptToken) {
         router.push(
-          `/free/success?claim=${encodeURIComponent(body.claimId)}&t=${encodeURIComponent(body.downloadToken)}`
+          `/free/success?claim=${encodeURIComponent(body.claimId)}&t=${encodeURIComponent(body.receiptToken)}`
         );
         return;
       }
@@ -54,8 +54,10 @@ export default function FreeClaimForm() {
       setError(
         body.code === "INVALID_EMAIL"
           ? (body.message ?? "Enter a valid email address.")
-          : (body.message ??
-            "We could not prepare your copy right now. Please try again in a moment.")
+          : body.code === "EBOOK_UNAVAILABLE"
+            ? "The ebook link is not available right now. Please try again shortly."
+            : (body.message ??
+              "We could not prepare your copy right now. Please try again in a moment.")
       );
     } catch {
       setStatus("error");
