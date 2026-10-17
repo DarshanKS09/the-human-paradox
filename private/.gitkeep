@@ -1,0 +1,2 @@
+Place the final ebook PDF here as ebook.pdf (see EBOOK_PDF_PATH).
+This directory is never served publicly and PDFs here are ignored by Git.
