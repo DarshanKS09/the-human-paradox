@@ -1,15 +1,36 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { getServerConfig } from "@/lib/config";
-import { getFreeClaimStore, jsonError, rateLimitOr429 } from "@/lib/http";
-import { claimFreeEbook, FreeClaimInputError } from "@/lib/free-claim";
-import { ClaimStorageError } from "@/lib/free-claims";
+import { jsonError, rateLimitOr429 } from "@/lib/http";
+import { deliverFreeEbook, FreeDeliveryError } from "@/lib/free-delivery";
 
 /**
- * FREE distribution mode claim endpoint.
+ * FREE distribution endpoint: submit an email address, receive the
+ * configured Google Drive link by email.
  *
- * No payment is created, required, or simulated. In PAID mode this route
- * refuses to run so a free claim can never shadow the paid checkout.
+ * No payment, no order, no claim record, no receipt token, no database.
+ * Success is reported only when the SMTP provider accepts the message.
  */
+
+// In-memory per-address cooldown (deliberately not persisted). Absorbs
+// double-clicks and accidental repeats without any external database.
+const COOLDOWN_MS = 5 * 60_000;
+const recentSends = new Map<string, number>();
+
+function emailKey(email: string): string {
+  // Hashed so the address is never held or logged in the clear.
+  return createHash("sha256")
+    .update(email.trim().toLowerCase())
+    .digest("hex")
+    .slice(0, 32);
+}
+
+function prune(now: number): void {
+  for (const [key, at] of recentSends) {
+    if (now - at > COOLDOWN_MS) recentSends.delete(key);
+  }
+}
+
 export async function POST(req: Request) {
   const limited = rateLimitOr429(req, "free-claim", 5, 60_000);
   if (limited) return limited;
@@ -22,23 +43,6 @@ export async function POST(req: Request) {
       "Free claims are not available in this mode."
     );
   }
-  if (!cfg.downloadTokenSecret) {
-    return jsonError(
-      503,
-      "DELIVERY_UNAVAILABLE",
-      "Digital delivery is being set up. Please try again later."
-    );
-  }
-
-  // Fail closed: never mint a receipt or send an email when the delivery
-  // link is missing or malformed, so nobody receives a broken link.
-  if (!cfg.ebookDriveUrl) {
-    return jsonError(
-      503,
-      "EBOOK_UNAVAILABLE",
-      "The ebook download link is not configured yet. Please check back shortly."
-    );
-  }
 
   let body: { email?: unknown };
   try {
@@ -47,51 +51,49 @@ export async function POST(req: Request) {
     return jsonError(400, "INVALID_BODY", "Request body must be valid JSON.");
   }
 
+  if (typeof body.email === "string") {
+    const now = Date.now();
+    prune(now);
+    const last = recentSends.get(emailKey(body.email));
+    if (last && now - last < COOLDOWN_MS) {
+      return jsonError(
+        429,
+        "ALREADY_SENT",
+        "We already sent your copy to this address a moment ago. Please check your inbox and spam folder."
+      );
+    }
+  }
+
   try {
-    const result = await claimFreeEbook(
+    const result = await deliverFreeEbook(
       {
-        store: getFreeClaimStore(),
-        downloadTokenSecret: cfg.downloadTokenSecret,
-        linkTtlSeconds: cfg.freeLinkTtlHours * 3600,
-        appBaseUrl: cfg.appBaseUrl,
         driveUrl: cfg.ebookDriveUrl,
         smtp: cfg.smtp,
         emailFrom: cfg.emailFrom,
-        cooldownMinutes: cfg.freeEmailCooldownMinutes,
-        maxEmailsPerDay: cfg.freeMaxEmailsPerDay,
       },
       body.email
     );
-    // Deliberately excludes the customer's email and any SMTP detail.
+
+    if (result.accepted && typeof body.email === "string") {
+      recentSends.set(emailKey(body.email), Date.now());
+    }
+
+    // `emailAccepted` means the provider took the message — not that it was
+    // delivered or read. The Drive link is public configuration and is
+    // returned so the page can offer the download button immediately.
     return NextResponse.json({
       ok: true,
-      claimId: result.claimId,
-      receiptToken: result.downloadToken,
-      driveUrl: result.driveUrl,
-      emailSent: result.emailSent,
-      emailStatus: result.emailStatus,
+      emailAccepted: true,
+      driveUrl: cfg.ebookDriveUrl,
     });
   } catch (err) {
-    if (err instanceof FreeClaimInputError) {
-      return jsonError(400, err.code, err.message);
+    if (err instanceof FreeDeliveryError) {
+      return jsonError(err.status, err.code, err.message);
     }
-    if (err instanceof ClaimStorageError) {
-      // Durable storage is missing/unwritable (typical on serverless).
-      // Report an actionable, non-technical state — never a fake success.
-      console.warn(
-        JSON.stringify({ msg: "free claim storage unavailable", code: err.code })
-      );
-      return jsonError(
-        503,
-        err.code,
-        "We could not save your request right now. Please try again shortly."
-      );
-    }
-    // Never leak internals.
     return jsonError(
       500,
-      "CLAIM_FAILED",
-      "We could not prepare your copy. Please try again in a moment."
+      "DELIVERY_FAILED",
+      "We could not send the email just now. Please try again in a moment."
     );
   }
 }

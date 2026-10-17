@@ -99,14 +99,9 @@ export interface ServerConfig {
    * download the file.
    */
   ebookDriveUrl: string | null;
-  /** Durable KV store (Upstash/Vercel KV REST). Null = local file store. */
+  /** Durable KV store (Upstash/Vercel KV REST) — PAID mode order storage only. */
   kvRestApiUrl: string | null;
   kvRestApiToken: string | null;
-  freeClaimsDbPath: string;
-  freeLinkTtlHours: number;
-  freeEmailCooldownMinutes: number;
-  freeMaxEmailsPerDay: number;
-  freeMaxDownloadsPerClaim: number;
   /** Set to block live gateway calls (audit/test safety). */
   allowLivePayments: boolean;
   smtp: SmtpConfig | null;
@@ -155,16 +150,6 @@ export function getServerConfig(): ServerConfig {
   if (!smtpPassword) smtpMissing.push("SMTP_PASSWORD");
 
   const ttlHours = Number.parseInt(env("DOWNLOAD_LINK_TTL_HOURS") ?? "72", 10);
-  const freeTtlHours = Number.parseInt(env("FREE_LINK_TTL_HOURS") ?? "72", 10);
-  const freeCooldown = Number.parseInt(
-    env("FREE_EMAIL_COOLDOWN_MINUTES") ?? "10",
-    10
-  );
-  const freeDaily = Number.parseInt(env("FREE_MAX_EMAILS_PER_DAY") ?? "3", 10);
-  const freeDownloads = Number.parseInt(
-    env("FREE_MAX_DOWNLOADS_PER_CLAIM") ?? "10",
-    10
-  );
   const maxDownloads = Number.parseInt(
     env("MAX_DOWNLOADS_PER_ORDER") ?? "5",
     10
@@ -191,15 +176,6 @@ export function getServerConfig(): ServerConfig {
     ebookDriveUrl: parseEbookDriveUrl(env("EBOOK_DRIVE_URL")),
     kvRestApiUrl: env("KV_REST_API_URL"),
     kvRestApiToken: env("KV_REST_API_TOKEN"),
-    freeClaimsDbPath: env("FREE_CLAIMS_DB_PATH") ?? "./data/free-claims.json",
-    freeLinkTtlHours:
-      Number.isFinite(freeTtlHours) && freeTtlHours > 0 ? freeTtlHours : 72,
-    freeEmailCooldownMinutes:
-      Number.isFinite(freeCooldown) && freeCooldown >= 0 ? freeCooldown : 10,
-    freeMaxEmailsPerDay:
-      Number.isFinite(freeDaily) && freeDaily > 0 ? freeDaily : 3,
-    freeMaxDownloadsPerClaim:
-      Number.isFinite(freeDownloads) && freeDownloads > 0 ? freeDownloads : 10,
     smtp:
       smtpMissing.length === 0
         ? {

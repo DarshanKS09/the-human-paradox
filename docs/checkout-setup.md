@@ -37,12 +37,10 @@ Copy `.env.example` to `.env.local` and fill in:
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Server-side gateway credentials. Test keys start `rzp_test_`, live keys `rzp_live_`. The key type selects **test vs live mode** automatically (returned as `testMode` by create-order). |
 | `RAZORPAY_WEBHOOK_SECRET` | From Razorpay Dashboard → Settings → Webhooks, for the endpoint below. |
 | `DISTRIBUTION_MODE` | `FREE` (default) or `PAID`. See section 0. |
-| `ORDERS_DB_PATH` | Default `./data/orders.json` (git-ignored). Used in PAID mode. |
-| `FREE_CLAIMS_DB_PATH` | Default `./data/free-claims.json` (git-ignored). Used in FREE mode. |
-| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | **Required on Vercel.** Durable KV (Upstash Redis / Vercel KV REST). Without it, records are written to the local filesystem, which is ephemeral on serverless and will lose data across cold starts and deployments. |
-| `EBOOK_PDF_PATH` | Default `./private/ebook.pdf`. Local-file fallback only. |
-| `EBOOK_PDF_URL` / `EBOOK_PDF_TOKEN` | Preferred on Vercel: a private object-storage URL the server fetches at download time. Keeps the PDF out of the repo/bundle and off any public path. |
-| `FREE_LINK_TTL_HOURS` / `FREE_EMAIL_COOLDOWN_MINUTES` / `FREE_MAX_EMAILS_PER_DAY` / `FREE_MAX_DOWNLOADS_PER_CLAIM` | FREE-mode delivery limits. Defaults 72 / 10 / 3 / 10. |
+| `ORDERS_DB_PATH` | Default `./data/orders.json` (git-ignored). **PAID mode only.** |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Durable KV for **PAID mode** order storage on serverless. Not needed for FREE mode. |
+| `EBOOK_PDF_PATH` | Default `./private/ebook.pdf`. **PAID mode only** (local-file fallback). |
+| `EBOOK_PDF_URL` / `EBOOK_PDF_TOKEN` | **PAID mode only**: private object storage fetched server-side at download time. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `EMAIL_FROM` | Brevo SMTP sending. Requires a Brevo account, SMTP credentials, and a **verified sender** (email address or domain). Port 587 uses STARTTLS; port 465 uses implicit TLS. |
 | `APP_BASE_URL` | Public URL used to build download links, e.g. `https://yourdomain.com`. |
 | `DOWNLOAD_TOKEN_SECRET` | Random 32+ byte secret for signing download/receipt tokens. |
@@ -93,18 +91,18 @@ spread.
 are read-only and replaced on every deployment, so anything written to
 `./data/` or read from `./private/` will disappear between invocations.
 
-Before deploying, configure durable storage:
+Before deploying, note what each mode needs:
 
-1. **Records (required):** create an Upstash Redis or Vercel KV store and set
-   `KV_REST_API_URL` + `KV_REST_API_TOKEN`. Free claims and paid orders are then
-   stored in that durable KV instead of local JSON.
-   - FREE mode: `src/lib/free-claims.ts` (atomic `SET NX` create prevents
-     duplicate claims).
-   - PAID mode: `src/lib/orders.ts` still uses the file store — for paid mode on
-     serverless, also migrate `OrderStore` to Postgres as described below.
-2. **PDF (required):** upload the ebook to private object storage (S3, R2,
-   Cloudflare R2, or any authenticated endpoint) and set `EBOOK_PDF_URL`
-   (plus `EBOOK_PDF_TOKEN` if your storage requires a bearer token). The server
+- **FREE mode: nothing.** No database, no KV, no filesystem. The ebook is a
+  Google Drive link in configuration, sent by email.
+- **PAID mode:** orders must persist.
+  1. **Orders:** either keep a persistent volume for `ORDERS_DB_PATH`, or
+     implement the `OrderStore` interface in `src/lib/orders.ts` against
+     Postgres as described below. `KV_REST_API_URL` / `KV_REST_API_TOKEN` remain
+     available for durable order storage; the free flow does not use them.
+  2. **PDF (required for PAID):** upload the ebook to private object storage
+     (S3, R2, or any authenticated endpoint) and set `EBOOK_PDF_URL`
+     (plus `EBOOK_PDF_TOKEN` if your storage requires a bearer token). The server
    fetches it only when serving an authorized download. Never place the PDF in
    `public/` or commit it.
 
@@ -119,8 +117,9 @@ migration has been applied — there is no database yet.
 
 ## 6. Free delivery (Google Drive)
 
-In FREE mode the ebook is delivered as a **Google Drive share link**, so no
-file needs to exist in the deployment.
+In FREE mode the ebook is delivered as a **Google Drive share link**, sent by
+email. There is no database, no claim record, no receipt token and no download
+endpoint in this flow — the link already lives in configuration.
 
 1. Upload the finished ebook to Google Drive.
 2. Share it: **Anyone with the link → Viewer** (this is what makes the link
@@ -132,10 +131,19 @@ file needs to exist in the deployment.
    EBOOK_DRIVE_URL=https://drive.google.com/file/d/<FILE_ID>/view?usp=sharing
    ```
 
-The link is validated server-side: only `https` `drive.google.com` URLs with a
-file id are accepted. If it is missing or invalid, `/api/free/claim` returns
-`503 EBOOK_UNAVAILABLE`, **no email is sent**, and the checkout page shows a
-configuration notice rather than a broken button.
+Flow: validate email → validate Drive URL → send via Brevo → report the
+provider's acceptance. Success is returned **only** when the SMTP provider
+accepts the message; a failure returns a retryable error and no success is
+shown.
+
+Anti-abuse (no external service): 5 requests/minute per IP and a 5-minute
+per-address cooldown, both held in memory. Because they are in-memory, they
+reset on a serverless cold start — that is an accepted trade-off for a free
+link that is, by design, public.
+
+The Drive URL is validated server-side: only `https` `drive.google.com` URLs
+with a file id are accepted. If it is missing or invalid, `/api/free/claim`
+returns `503 EBOOK_UNAVAILABLE` and **no email is sent**.
 
 ### What this changes about security
 
@@ -158,21 +166,25 @@ no customer data, no tokens:
 
 ```json
 { "distributionMode": "FREE", "checks": {
-  "tokenSigningConfigured": true, "smtpConfigured": true,
-  "ebookAvailable": true, "ebookSource": "remote",
-  "durableClaimStorage": true, "appBaseUrlConfigured": true } }
+  "driveLinkConfigured": true, "smtpConfigured": true,
+  "freeDeliveryReady": true } }
 ```
+
+In FREE mode the only requirements are a valid Drive URL and SMTP; storage is
+irrelevant.
 
 Symptom → cause → fix:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Claim returns `503 DELIVERY_UNAVAILABLE` | `DOWNLOAD_TOKEN_SECRET` missing | Set it (32+ random bytes) |
+| Claim returns `503 DELIVERY_UNAVAILABLE` | (PAID mode only) `DOWNLOAD_TOKEN_SECRET` missing | Set it (32+ random bytes) |
 | Claim returns `503 EBOOK_UNAVAILABLE` | `EBOOK_DRIVE_URL` missing or not a valid Drive link | Set `EBOOK_DRIVE_URL` (see section 6) and ensure the Drive file is shared "Anyone with the link" |
+| Claim returns `503 EMAIL_NOT_CONFIGURED` | SMTP not set up | Set `SMTP_HOST/PORT/USER/PASSWORD` and `EMAIL_FROM` |
+| Claim returns `429 ALREADY_SENT` | Same address requested again within 5 minutes | Expected behaviour; check the inbox |
 | Email arrives but the Drive link won't open | Drive file is not shared publicly | Drive → Share → Anyone with the link → Viewer |
 | Emailed link points at `localhost` | `APP_BASE_URL` unset | Set `APP_BASE_URL=https://your-domain` |
 | Claims vanish after a deploy | No durable storage | Set `KV_REST_API_URL` + `KV_REST_API_TOKEN` |
-| Claim returns `503 CLAIM_STORAGE_UNAVAILABLE` | Claims cannot be persisted (read-only filesystem on Vercel with no KV) | Set `KV_REST_API_URL` + `KV_REST_API_TOKEN`; confirm `claimStorageUsable: true` in `/api/health` |
+| Claim returns `503 CLAIM_STORAGE_UNAVAILABLE` | (legacy) no longer applicable — the free flow stores nothing | — |
 | Checkout says "download link has not been configured" | `EBOOK_DRIVE_URL` unset/invalid | Set it (FREE mode) |
 
 Claims **fail closed by design**: if the delivery link is missing or invalid, no
@@ -202,14 +214,13 @@ EMAIL_FROM="The Human Paradox <hello@yourdomain.com>"
 npm run dev
 ```
 
-1. Open `http://localhost:3000/checkout` → "Get Your Free Copy", then click "Send Me the Free Ebook". The checkout page has a single email form; to request a fresh link later, submit the same address again.
-2. Enter an invalid email → inline validation, no request sent.
-3. Enter a valid email → redirected to `/free/success` with a working
-   "Download Your Ebook" button.
-4. With SMTP configured, confirm the email arrives (Brevo → logs). Without it,
-   the page says the email could not be sent and the download still works.
-5. Submit the same address again → same claim/token, and no second email
-   within the cooldown window (rate limit returns 429 after repeated hits).
+1. Open `http://localhost:3000/checkout` → "Get Your Free Copy", enter an email,
+   click "Send Me the Free Ebook".
+2. Invalid email → inline validation, no request sent.
+3. Valid email → inline confirmation ("Your ebook is on its way") plus a
+   "Download Your Ebook" button that opens the Drive link in a new tab.
+4. With SMTP configured, confirm the email arrives (Brevo → logs).
+5. Submit the same address again within 5 minutes → `429 ALREADY_SENT`.
 
 ## 8. Test a paid purchase (PAID mode, test mode)
 
@@ -222,12 +233,9 @@ npm run dev
 ## 9. Remaining work before live launch
 
 - [ ] Decide `DISTRIBUTION_MODE` for launch (FREE is the safe default).
-- [ ] **Durable storage on Vercel:** `KV_REST_API_URL` + `KV_REST_API_TOKEN`
-      configured; otherwise free claims cannot be saved at all
-      (503 CLAIM_STORAGE_UNAVAILABLE) and would be lost on redeploy.
 - [ ] FREE mode: `EBOOK_DRIVE_URL` set to a Drive file shared
-      "Anyone with the link", and `DOWNLOAD_TOKEN_SECRET` + `APP_BASE_URL`
-      set. No local PDF is required in the deployment.
+      "Anyone with the link". No database, KV or local PDF is required.
+- [ ] PAID mode only: durable order storage and `EBOOK_PDF_URL`.
 - [ ] Brevo account + verified sender; SMTP credentials and `EMAIL_FROM` set;
       one real test email received (delivery is not otherwise verifiable).
 - [ ] `APP_BASE_URL` set to the production domain; HTTPS.

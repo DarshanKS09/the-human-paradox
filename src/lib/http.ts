@@ -1,38 +1,19 @@
 import { NextResponse } from "next/server";
 import { getServerConfig } from "./config";
 import { createOrderStore, type OrderStore } from "./orders";
-import { createFreeClaimStore, type FreeClaimStore } from "./free-claims";
 import { checkRateLimit, clientIp } from "./rate-limit";
 
 let store: OrderStore | null = null;
-let freeStore: FreeClaimStore | null = null;
 
-/** Default store rooted at ORDERS_DB_PATH (server only). */
+/** Paid-order store rooted at ORDERS_DB_PATH (server only). */
 export function getStore(): OrderStore {
   if (!store) store = createOrderStore(getServerConfig().ordersDbPath);
   return store;
 }
 
-/**
- * Free-claim store. Uses durable KV when configured, otherwise a local
- * JSON file (single-instance development only).
- */
-export function getFreeClaimStore(): FreeClaimStore {
-  if (!freeStore) {
-    const cfg = getServerConfig();
-    freeStore = createFreeClaimStore({
-      kvRestApiUrl: cfg.kvRestApiUrl,
-      kvRestApiToken: cfg.kvRestApiToken,
-      dbPath: cfg.freeClaimsDbPath,
-    });
-  }
-  return freeStore;
-}
-
-/** Test-only hook to drop the cached stores between tests. */
+/** Test-only hook to drop the cached store between tests. */
 export function resetStore(): void {
   store = null;
-  freeStore = null;
 }
 
 export function jsonError(status: number, code: string, message: string) {

@@ -18,10 +18,10 @@ export default function CheckoutPage() {
   const freeMode = cfg.distributionMode === "FREE";
   // In FREE mode there is no payment to make, so no gateway credentials
   // are required to offer the claim flow.
-  // FREE delivery needs a validated Drive link + token signing; PAID delivery
-  // additionally needs a reachable PDF. Only offer what can actually work.
+  // FREE delivery needs a validated Drive link only (SMTP is checked on
+  // submit). PAID delivery needs the gateway, token signing and a PDF.
   const claimAvailable = freeMode
-    ? cfg.downloadTokenSecret !== null && cfg.ebookDriveUrl !== null
+    ? cfg.ebookDriveUrl !== null
     : cfg.payments !== null && cfg.downloadTokenSecret !== null;
 
   return (
